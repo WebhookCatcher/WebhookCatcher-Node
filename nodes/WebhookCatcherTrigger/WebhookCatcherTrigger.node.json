@@ -1,0 +1,15 @@
+{
+	"node": "@webhookcatcher/n8n-nodes-webhookcatcher.webhookCatcherTrigger",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Development", "Utility"],
+	"alias": ["webhook", "webhooks", "inspect", "forward", "replay"],
+	"resources": {
+		"credentialDocumentation": [
+			{ "url": "https://github.com/WebhookCatcher/WebhookCatcher-Node#credentials" }
+		],
+		"primaryDocumentation": [
+			{ "url": "https://github.com/WebhookCatcher/WebhookCatcher-Node#readme" }
+		]
+	}
+}

@@ -1,54 +1,64 @@
 {
-  "name": "@webhookcatcher/n8n-nodes-webhookcatcher",
-  "version": "0.1.0",
-  "description": "Webhookcatcher node for n8n",
-  "keywords": [
-    "n8n-community-node-package"
-  ],
-  "license": "MIT",
-  "homepage": "",
-  "author": {
-    "name": "Omar Hernández",
-    "email": "happones@hotmail.com"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/happones/n8n-nodes-webhookcatcher.git"
-  },
-  "engines": {
-    "node": ">=20.15"
-  },
-  "main": "index.js",
-  "scripts": {
-    "build": "npx rimraf dist && tsc && gulp build:icons",
-    "dev": "tsc --watch",
-    "format": "prettier nodes credentials --write",
-    "lint": "eslint nodes credentials package.json",
-    "lintfix": "eslint nodes credentials package.json --fix",
-    "prepublishOnly": "npm run build && npm run lint -c .eslintrc.prepublish.js nodes credentials package.json"
-  },
-  "files": [
-    "dist"
-  ],
-  "n8n": {
-    "n8nNodesApiVersion": 1,
-    "credentials": [
-      "dist/credentials/WebhookCatcherCredentialsApi.credentials.js"
-    ],
-    "nodes": [
-      "dist/nodes/WebhookCatcherNode/WebhookCatcherNode.node.js"
-    ]
-  },
-  "devDependencies": {
-    "@types/node": "^24.3.0",
-    "@typescript-eslint/parser": "~8.32.0",
-    "eslint": "^8.57.0",
-    "eslint-plugin-n8n-nodes-base": "^1.16.3",
-    "gulp": "^5.0.0",
-    "prettier": "^3.5.3",
-    "typescript": "^5.8.2"
-  },
-  "peerDependencies": {
-    "n8n-workflow": "*"
-  }
+	"name": "@webhookcatcher/n8n-nodes-webhookcatcher",
+	"version": "0.2.0",
+	"description": "n8n nodes for WebhookCatcher: manage endpoints, forwarding targets, auth methods and webhook requests, and trigger workflows from incoming webhooks.",
+	"license": "MIT",
+	"homepage": "https://github.com/WebhookCatcher/WebhookCatcher-Node#readme",
+	"keywords": [
+		"n8n-community-node-package",
+		"n8n",
+		"webhook",
+		"webhooks",
+		"webhookcatcher"
+	],
+	"author": {
+		"name": "Omar Hernández",
+		"email": "happones@hotmail.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/WebhookCatcher/WebhookCatcher-Node.git"
+	},
+	"bugs": {
+		"url": "https://github.com/WebhookCatcher/WebhookCatcher-Node/issues"
+	},
+	"engines": {
+		"node": ">=20.19"
+	},
+	"scripts": {
+		"build": "n8n-node build",
+		"build:watch": "tsc --watch",
+		"dev": "n8n-node dev",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"format": "prettier credentials nodes --write",
+		"release": "n8n-node release",
+		"prepublishOnly": "n8n-node prerelease"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": true,
+		"credentials": [
+			"dist/credentials/WebhookCatcherApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/WebhookCatcher/WebhookCatcher.node.js",
+			"dist/nodes/WebhookCatcherTrigger/WebhookCatcherTrigger.node.js",
+			"dist/nodes/WebhookCatcherPollingTrigger/WebhookCatcherPollingTrigger.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "^0.51.3",
+		"eslint": "^9.39.5",
+		"n8n-workflow": "^2.16.0",
+		"prettier": "^3.9.9",
+		"release-it": "^21.1.0",
+		"typescript": "^5.9.3"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
 }

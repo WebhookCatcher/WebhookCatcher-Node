@@ -1,0 +1,285 @@
+<p align="center">
+  <a href="https://webhookcatcher.com">
+    <img src="https://raw.githubusercontent.com/WebhookCatcher/WebhookCatcher-Node/main/docs/images/logo.png" alt="WebhookCatcher" width="120" height="120">
+  </a>
+</p>
+
+<h1 align="center">WebhookCatcher for n8n</h1>
+
+<p align="center">
+  Fange webhooks mit <a href="https://webhookcatcher.com">WebhookCatcher</a> ab, prüfe, sichere und leite sie weiter, und reagiere in deinen <a href="https://n8n.io">n8n</a> workflows darauf.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@webhookcatcher/n8n-nodes-webhookcatcher"><img src="https://img.shields.io/npm/v/@webhookcatcher/n8n-nodes-webhookcatcher.svg" alt="npm version"></a>
+  <a href="../LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+  <a href="https://docs.n8n.io/integrations/community-nodes/"><img src="https://img.shields.io/badge/n8n-community%20node-ff6d5a.svg" alt="n8n community node"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/WebhookCatcher/WebhookCatcher-Node/blob/main/README.md">English</a> ·
+  <a href="https://github.com/WebhookCatcher/WebhookCatcher-Node/blob/main/docs/README.es.md">Español</a> ·
+  <b>Deutsch</b> ·
+  <a href="https://github.com/WebhookCatcher/WebhookCatcher-Node/blob/main/docs/README.fr.md">Français</a> ·
+  <a href="https://github.com/WebhookCatcher/WebhookCatcher-Node/blob/main/docs/README.pt.md">Português</a> ·
+  <a href="https://github.com/WebhookCatcher/WebhookCatcher-Node/blob/main/docs/README.ja.md">日本語</a> ·
+  <a href="https://github.com/WebhookCatcher/WebhookCatcher-Node/blob/main/docs/README.ru.md">Русский</a> ·
+  <a href="https://github.com/WebhookCatcher/WebhookCatcher-Node/blob/main/docs/README.zh.md">中文</a>
+</p>
+
+---
+
+Dieses Paket fügt n8n drei nodes hinzu:
+
+| Node | Was er tut |
+| :--- | :--- |
+| **WebhookCatcher** | Verwaltet endpoints, forwarding targets, auth methods und webhook requests, liest die Nutzung und die Analytics deines Accounts und stellt requests erneut zu. n8n AI Agents können ihn auch als Tool verwenden. |
+| **WebhookCatcher Trigger** | Startet einen workflow in Echtzeit, sobald ein endpoint einen webhook erhält. Erfordert eine n8n-Instanz, die aus dem Internet erreichbar ist. |
+| **WebhookCatcher Polling Trigger** | Startet einen workflow, wenn neue requests gespeichert werden. Funktioniert mit n8n auf localhost oder hinter einer Firewall. |
+
+## Inhalt
+
+- [Installation](#installation)
+- [Credentials](#credentials)
+- [Token-Berechtigungen](#token-berechtigungen)
+- [WebhookCatcher node](#webhookcatcher-node)
+- [WebhookCatcher Trigger](#webhookcatcher-trigger)
+- [WebhookCatcher Polling Trigger](#webhookcatcher-polling-trigger)
+- [Welchen Trigger soll ich verwenden?](#welchen-trigger-soll-ich-verwenden)
+- [Beispiel-workflows](#beispiel-workflows)
+- [Fehlerbehebung](#fehlerbehebung)
+- [Entwicklung](#entwicklung)
+- [Ressourcen](#ressourcen)
+
+## Installation
+
+### Über den n8n-Editor (empfohlen)
+
+1. Öffne **Settings → Community Nodes**.
+2. Klicke auf **Install**.
+3. Gib `@webhookcatcher/n8n-nodes-webhookcatcher` ein und bestätige.
+4. Suche im nodes-Panel nach **WebhookCatcher**.
+
+Mehr Details findest du im [n8n community nodes guide](https://docs.n8n.io/integrations/community-nodes/installation/).
+
+### Manuelle Installation (selbst gehostetes n8n)
+
+```bash
+cd ~/.n8n/nodes
+npm install @webhookcatcher/n8n-nodes-webhookcatcher
+```
+
+Starte n8n nach der Installation neu. Mit Docker führst du den Befehl im Container aus (in `/home/node/.n8n/nodes`) und startest den Container neu.
+
+## Credentials
+
+Die nodes authentifizieren sich mit einem WebhookCatcher **API token**.
+
+> [!NOTE]
+> Der API-Zugriff ist in den Plänen **Pro**, **Team** und **Business** verfügbar. requests mit einem token eines Teams ohne API-Zugriff werden mit `403` abgelehnt.
+
+1. Melde dich bei [WebhookCatcher](https://webhookcatcher.com) an.
+2. Öffne dein Profilmenü → **API Tokens**.
+3. Gib einen Namen ein (zum Beispiel `n8n`) und wähle die [Berechtigungen](#token-berechtigungen), die deine workflows brauchen.
+4. Kopiere den token. Er wird nur einmal angezeigt.
+5. Erstelle in n8n eine **WebhookCatcher API** credential:
+
+| Field | Value |
+| :--- | :--- |
+| **API Token** | Der token, den du gerade erstellt hast. |
+| **Base URL** | `https://webhookcatcher.com/api/v1`. Ändere sie nur für eine selbst gehostete WebhookCatcher-Instanz. |
+
+n8n testet die credential mit einem Aufruf von `GET /account`. Der token braucht also mindestens die Berechtigung `account:read`.
+
+Ein token gehört zu dem Team, das beim Erstellen aktiv war. Jeder node, der die credential verwendet, arbeitet mit den endpoints und requests dieses Teams.
+
+## Token-Berechtigungen
+
+Gib jedem token nur die Berechtigungen, die seine workflows brauchen.
+
+| Permission | Allows |
+| :--- | :--- |
+| `account:read` | Account, Plan, Nutzung und Analytics. Erforderlich, um die credential zu testen. |
+| `endpoints:read` | endpoints auflisten und lesen. Wird von jedem endpoint-Dropdown verwendet. |
+| `endpoints:write` | endpoints erstellen, aktualisieren und löschen. |
+| `forwarding-targets:read` | forwarding targets auflisten und lesen. |
+| `forwarding-targets:write` | forwarding targets erstellen, aktualisieren und löschen. |
+| `auth-methods:read` | auth methods auflisten und lesen. |
+| `auth-methods:write` | auth methods erstellen, aktualisieren, löschen und neu generieren. |
+| `requests:read` | webhook requests und ihre forwarding deliveries auflisten und lesen. |
+| `requests:redeliver` | webhook requests erneut zustellen (Replay). |
+| `cli:tunnel` | Wird vom WebhookCatcher CLI verwendet. In n8n nicht nötig. |
+
+Berechtigungen, die jeder node verwendet:
+
+| Node / operation | Permissions |
+| :--- | :--- |
+| Account → Get, Get Analytics | `account:read` |
+| Endpoint → Get, Get Many | `endpoints:read` |
+| Endpoint → Create, Update, Delete | `endpoints:write` |
+| Forwarding Target → Get, Get Many | `forwarding-targets:read` |
+| Forwarding Target → Create, Update, Delete | `forwarding-targets:write` |
+| Auth Method → Get, Get Many | `auth-methods:read` |
+| Auth Method → Create, Update, Delete, Regenerate Credentials | `auth-methods:write` |
+| Request → Get, Get Many, Get Deliveries | `requests:read` |
+| Request → Redeliver | `requests:redeliver` |
+| WebhookCatcher Trigger | `endpoints:read`, `forwarding-targets:read`, `forwarding-targets:write` |
+| WebhookCatcher Polling Trigger | `endpoints:read`, `requests:read` |
+
+Tokens, die vor diesen Berechtigungen erstellt wurden, funktionieren weiter: `read` erlaubt jede `:read`-Berechtigung, `write` erlaubt Erstellen, Aktualisieren und Löschen, und `*` erlaubt alles.
+
+Fehlt einem token eine Berechtigung, antwortet die API mit `403` und `This API token does not have the "<permission>" permission.`. Der node zeigt diese Meldung an.
+
+## WebhookCatcher node
+
+| Resource | Operations |
+| :--- | :--- |
+| **Account** | Get (Team, Plan, Funktionen, monatliche Nutzung und token-Details) · Get Analytics (Zeitraum) |
+| **Endpoint** | Create · Get · Get Many · Update · Delete |
+| **Forwarding Target** | Create · Get · Get Many · Update · Delete |
+| **Auth Method** | Create · Get · Get Many · Update · Delete · Regenerate Credentials |
+| **Request** | Get · Get Many · Get Deliveries · Redeliver |
+
+### Endpoint
+
+- **Create** erwartet einen Namen, einen Pfad, die akzeptierte HTTP-Methode und die Authentifizierung (`None`, `API Key`, `Basic Auth`, `Bearer Token` oder `HMAC`) mit der auth method, die sie validiert. Zusätzliche Felder: Beschreibung, aktiver Status und rate limit.
+- **Update** sendet nur die Felder, die du setzt. Der Rest des endpoints bleibt unverändert.
+- **Get Many** unterstützt **Return All** oder ein **Limit** und filtert nach aktivem Status.
+
+### Forwarding Target
+
+Leitet jeden request, den ein endpoint akzeptiert, an eine andere URL weiter. Optionen: HTTP-Methode, Authentifizierung für das Ziel, eigene headers, automatische Wiederholungen, aktiver Status, Beschreibung und **payload filters** (nur weiterleiten, wenn ein Feld des payload eine Bedingung erfüllt).
+
+Das Ziel muss eine öffentliche URL sein. Private, Loopback- und Link-Local-Adressen werden abgelehnt, um SSRF zu verhindern.
+
+### Auth Method
+
+Erstellt die Zugangsdaten, mit denen endpoints eingehende webhooks validieren: API key, Basic Auth (Benutzername und Passwort), Bearer token oder HMAC secret. **Regenerate Credentials** erneuert den generierten token oder das generierte secret und gibt den neuen Wert zurück.
+
+### Request
+
+- **Get Many** filtert nach endpoint, Status (`success`, `error`, `pending`, `timeout`), HTTP-Methode, Antwortcode und Zeitraum, sortiert mit den neuesten oder den ältesten zuerst.
+- **Get Deliveries** gibt jeden Weiterleitungsversuch eines requests zurück, mit Statuscode, Dauer, Fehler und Antwort-body.
+- **Redeliver** sendet einen gespeicherten request erneut an alle forwarding targets seines endpoints, an ein einzelnes forwarding target oder an eine eigene öffentliche URL.
+
+### Als AI Agent Tool verwenden
+
+Der WebhookCatcher node ist als `usableAsTool` markiert. Hänge ihn an einen n8n **AI Agent**, damit der Agent endpoints auflisten, fehlgeschlagene requests prüfen oder erneut zustellen kann.
+
+## WebhookCatcher Trigger
+
+Startet den workflow, sobald ein endpoint einen webhook akzeptiert.
+
+1. Füge den node **WebhookCatcher Trigger** hinzu und wähle den endpoint.
+2. Aktiviere den workflow oder klicke auf **Listen for test event**.
+
+Bei der Aktivierung erstellt der node ein forwarding target auf diesem endpoint. Es zeigt auf die n8n webhook URL und sendet einen zufälligen header `X-WebhookCatcher-Secret`. n8n lehnt jeden Aufruf ohne dieses secret mit `401` ab. Das forwarding target wird gelöscht, wenn du den workflow deaktivierst. Test- und Produktions-URLs erhalten getrennte forwarding targets.
+
+Ausgabe:
+
+```json
+{
+  "body": { "event": "invoice.paid", "id": "in_123" },
+  "query": {},
+  "headers": { "content-type": "application/json", "user-agent": "Stripe/1.0" },
+  "receivedAt": "2026-10-08T15:04:05.000Z"
+}
+```
+
+Deaktiviere **Options → Include Headers**, um nur body und query auszugeben.
+
+> [!IMPORTANT]
+> WebhookCatcher muss deine n8n-Instanz erreichen können. Setze `WEBHOOK_URL` in n8n auf die öffentliche URL. Für n8n auf `localhost` nutze den Polling Trigger.
+
+## WebhookCatcher Polling Trigger
+
+Prüft WebhookCatcher im gewählten Polling-Intervall auf neue requests (jede Minute, jede Stunde, …).
+
+- **Endpoint**: ein endpoint oder leer für alle endpoints.
+- **Filters → Status**: zum Beispiel nur `error` requests, um bei abgelehnten webhooks benachrichtigt zu werden.
+
+Bei der ersten Aktivierung startet der node beim neuesten request und spielt den Verlauf nicht erneut ab. Jeder Poll gibt die requests aus, die seit dem vorherigen Poll eingegangen sind, die ältesten zuerst, bis zu 500 pro Poll. Übrige requests folgen im nächsten Poll.
+
+Ein manueller Testlauf gibt den neuesten request zurück, damit du seine Felder zuordnen kannst.
+
+## Welchen Trigger soll ich verwenden?
+
+| | WebhookCatcher Trigger | WebhookCatcher Polling Trigger |
+| :--- | :--- | :--- |
+| Latenz | Echtzeit | Polling-Intervall |
+| n8n auf localhost oder in einem privaten Netzwerk | ❌ | ✅ |
+| Ausgabe | Ursprünglicher body, query und headers | Gespeicherter request (body, headers, Status, Antwortcode, Dauer, …) |
+| Abgelehnte requests | Nicht empfangen, nur akzeptierte requests werden weitergeleitet | Empfangen, nutze den Status-Filter |
+| Erstellt Ressourcen in WebhookCatcher | Ein forwarding target, solange er aktiv ist | Keine |
+
+## Beispiel-workflows
+
+- **Stripe → Slack**: WebhookCatcher Trigger auf deinem Stripe-endpoint → IF `body.type` ist `invoice.payment_failed` → Slack-Nachricht.
+- **Alarm bei abgelehnten webhooks**: Polling Trigger mit **Status = Error** → E-Mail oder Slack-Nachricht mit endpoint, Antwortcode und Fehler.
+- **Fehlgeschlagene Weiterleitungen wiederholen**: Schedule Trigger → Request: Get Many (Status `error`, letzte Stunde) → Request: Get Deliveries → Request: Redeliver.
+- **Täglicher Nutzungsbericht**: Schedule Trigger → Account: Get und Get Analytics → Google Sheets.
+- **Kunden-Onboarding**: Form Trigger → Auth Method: Create → Endpoint: Create → Forwarding Target: Create → URL und Zugangsdaten an den Kunden senden.
+
+## Fehlerbehebung
+
+| Problem | Solution |
+| :--- | :--- |
+| `401 Unauthenticated` | Der token ist falsch, abgelaufen oder gelöscht. Erstelle einen neuen. |
+| `403 Your active plan does not support API access` | Das Team des tokens braucht den Plan Pro, Team oder Business. |
+| `403 This API token does not have the "…" permission` | Bearbeite die token-Berechtigungen in WebhookCatcher → API Tokens. |
+| `422` mit Feldfehlern | Der node zeigt die Validierungsmeldung jedes Felds an. Prüfe die Werte, die du sendest. |
+| Der Trigger wird nie ausgelöst | n8n ist nicht öffentlich, `WEBHOOK_URL` ist nicht gesetzt oder der endpoint lehnt den webhook ab, bevor er ihn weiterleitet (prüfe seine Authentifizierung). Probiere den Polling Trigger. |
+| `URLs pointing to private or internal networks are not allowed.` | forwarding targets und erneute Zustellungen dürfen keine privaten oder lokalen Adressen verwenden. |
+| Dropdowns sind leer | Der token braucht die passende `:read`-Berechtigung. |
+
+## Entwicklung
+
+Voraussetzungen: Node.js 20.19 oder neuer und npm.
+
+```bash
+git clone https://github.com/WebhookCatcher/WebhookCatcher-Node.git
+cd WebhookCatcher-Node
+npm install
+npm run dev
+```
+
+`npm run dev` baut die nodes, baut sie bei Änderungen neu und startet ein lokales n8n unter <http://localhost:5678> mit geladenem Paket.
+
+| npm script | make | Description |
+| :--- | :--- | :--- |
+| `npm run dev` | `make dev` | Startet n8n mit den geladenen nodes und baut bei Änderungen neu. |
+| `npm run build` | `make build` | Kompiliert TypeScript und kopiert die Icons nach `dist/`. |
+| `npm run build:watch` | `make watch` | Kompiliert bei Änderungen neu, ohne n8n zu starten. |
+| `npm run lint` | `make lint` | Prüft den Code mit den n8n community node Regeln. |
+| `npm run lint:fix` | `make lint-fix` | Behebt die Probleme, die sich automatisch beheben lassen. |
+| `npm run format` | `make format` | Formatiert den Code mit Prettier. |
+| `npm run release` | `make release` | Erhöht die Version, aktualisiert das Changelog, setzt den Tag und pusht. |
+
+### Release erstellen
+
+Der [Publish workflow](../.github/workflows/publish.yml) veröffentlicht jedes Release auf npm mit einer Provenance-Bestätigung, die n8n für community nodes verlangt. Führe `npm run release` lokal aus: Es führt lint und build aus, erhöht die Version, erstellt den Tag und pusht ihn, und der workflow veröffentlicht das Paket.
+
+Richte npm **Trusted Publishing** für `WebhookCatcher/WebhookCatcher-Node` mit dem workflow `publish.yml` ein oder füge ein Repository-Secret `NPM_TOKEN` hinzu.
+
+### Projektstruktur
+
+```text
+credentials/
+  WebhookCatcherApi.credentials.ts      API token and base URL
+nodes/
+  WebhookCatcher/                       Action node, shared API helpers and descriptions
+  WebhookCatcherTrigger/                Real-time trigger (forwarding target + secret header)
+  WebhookCatcherPollingTrigger/         Polling trigger (cursor on request ids)
+docs/                                   Translated READMEs and images
+```
+
+## Ressourcen
+
+- [WebhookCatcher](https://webhookcatcher.com)
+- [n8n community nodes documentation](https://docs.n8n.io/integrations/#community-nodes)
+- [Report an issue](https://github.com/WebhookCatcher/WebhookCatcher-Node/issues)
+- Support: [support@webhookcatcher.com](mailto:support@webhookcatcher.com)
+
+## Lizenz
+
+[MIT](../LICENSE.md)

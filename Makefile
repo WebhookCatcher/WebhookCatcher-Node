@@ -1,52 +1,43 @@
-.PHONY: build dev lint lint-fix format clean install link help
+.PHONY: all help install build watch dev lint lint-fix format release clean
 
-# Default target
 all: build
 
-# Display help information about targets
 help:
-	@echo "======================================================================"
-	@echo "                  WebhookCatcher n8n Node Makefile                    "
-	@echo "======================================================================"
-	@echo "Available commands:"
-	@echo "  make install   - Install all node modules and dependencies"
-	@echo "  make build     - Clean dist, compile TypeScript, and bundle assets"
-	@echo "  make dev       - Run TypeScript compiler in watch mode"
-	@echo "  make lint      - Run ESLint checks (n8n strict compliance rules)"
-	@echo "  make lint-fix  - Automatically fix ESLint check violations"
-	@echo "  make format    - Format all files with Prettier"
-	@echo "  make clean     - Remove all build distribution files (dist)"
-	@echo "  make link      - Link this node locally so it is discoverable by n8n"
-	@echo "======================================================================"
+	@echo "WebhookCatcher n8n nodes"
+	@echo ""
+	@echo "  make install   Install dependencies"
+	@echo "  make dev       Start n8n with the nodes loaded and rebuild on change"
+	@echo "  make build     Compile TypeScript and copy the icons into dist/"
+	@echo "  make watch     Recompile on change without starting n8n"
+	@echo "  make lint      Check the code with the n8n community node rules"
+	@echo "  make lint-fix  Fix the issues that can be fixed automatically"
+	@echo "  make format    Format the code with Prettier"
+	@echo "  make release   Bump the version, update the changelog, tag and push"
+	@echo "  make clean     Remove dist/"
 
-# Install node packages
 install:
 	npm install
 
-# Build the custom node distribution files
 build:
 	npm run build
 
-# Watch for file changes during development
+watch:
+	npm run build:watch
+
 dev:
 	npm run dev
 
-# Run ESLint compliance checks
 lint:
 	npm run lint
 
-# Auto-fix lint violations where possible
 lint-fix:
-	npm run lintfix
+	npm run lint:fix
 
-# Format code with Prettier
 format:
 	npm run format
 
-# Clean the build directory
-clean:
-	npx rimraf dist
+release:
+	npm run release
 
-# Link the node package locally so n8n can find and load it
-link:
-	npm link
+clean:
+	rm -rf dist
