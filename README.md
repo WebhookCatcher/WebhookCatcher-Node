@@ -152,6 +152,8 @@ Forwards every request that an endpoint accepts to another URL. Options: HTTP me
 
 The destination must be a public URL. Private, loopback and link-local addresses are rejected to prevent SSRF.
 
+When the target has an auth method, WebhookCatcher authenticates each forwarded request with it: `X-API-KEY` for API keys, `Authorization: Bearer …` or `Authorization: Basic …`, or `X-Timestamp` and `X-Signature` for HMAC (`hash_hmac('sha256', timestamp + body, secret)` over the exact body sent). If the auth method is inactive or expired, the delivery fails instead of being sent without credentials. Set **Authentication** to `None` to remove it.
+
 ### Auth Method
 
 Creates the credentials that endpoints use to validate incoming webhooks: API key, Basic Auth (username and password), Bearer token or HMAC secret. **Regenerate Credentials** rotates the generated token or secret and returns the new value.
@@ -161,6 +163,7 @@ Creates the credentials that endpoints use to validate incoming webhooks: API ke
 - **Get Many** filters by endpoint, status (`success`, `error`, `pending`, `timeout`), HTTP method, response code and date range, sorted newest or oldest first.
 - **Get Deliveries** returns every forwarding attempt of a request with its status code, duration, error and response body.
 - **Redeliver** sends a stored request again to all forwarding targets of its endpoint, to one forwarding target, or to a custom public URL.
+- Every request includes `body` (parsed) and `raw_body`: the exact bytes received, for XML, plain text or signed payloads. `raw_body` is `null` when it is identical to `body` encoded as JSON.
 
 ### Use as an AI Agent tool
 
@@ -187,6 +190,8 @@ Output:
 ```
 
 Turn off **Options → Include Headers** to output only the body and query.
+
+Turn on **Options → Include Raw Body** to also output `rawBody`, the body exactly as it was received. WebhookCatcher forwards the original bytes and `Content-Type`, so XML, form and plain text webhooks arrive unchanged.
 
 > [!IMPORTANT]
 > WebhookCatcher must be able to reach your n8n instance. Set `WEBHOOK_URL` in n8n to its public URL. For n8n on `localhost`, use the Polling Trigger.

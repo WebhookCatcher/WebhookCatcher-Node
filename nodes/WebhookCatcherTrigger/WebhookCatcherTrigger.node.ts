@@ -100,6 +100,14 @@ export class WebhookCatcherTrigger implements INodeType {
 						default: true,
 						description: 'Whether to output the original request headers next to the body',
 					},
+					{
+						displayName: 'Include Raw Body',
+						name: 'includeRawBody',
+						type: 'boolean',
+						default: false,
+						description:
+							'Whether to output the body exactly as it was received, as text. Use it for XML or plain text webhooks, or to verify a signature of the original sender.',
+					},
 				],
 			},
 		],
@@ -226,6 +234,20 @@ export class WebhookCatcherTrigger implements INodeType {
 
 		if (options.includeHeaders !== false) {
 			item.headers = forwardedHeaders;
+		}
+
+		if (options.includeRawBody === true) {
+			// n8n keeps the unparsed bytes on the request; older versions read them on demand.
+			const request = this.getRequestObject() as unknown as {
+				rawBody?: Buffer;
+				readRawBody?: () => Promise<void>;
+			};
+
+			if (request.rawBody === undefined && typeof request.readRawBody === 'function') {
+				await request.readRawBody();
+			}
+
+			item.rawBody = request.rawBody ? request.rawBody.toString('utf8') : '';
 		}
 
 		return {

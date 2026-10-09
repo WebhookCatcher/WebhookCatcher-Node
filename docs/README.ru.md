@@ -152,6 +152,8 @@ Tokens, созданные до появления этих разрешений
 
 Адресат должен быть публичным URL. Частные, loopback и link-local адреса отклоняются для защиты от SSRF.
 
+Если у target есть auth method, WebhookCatcher аутентифицирует им каждый пересылаемый request: `X-API-KEY` для API keys, `Authorization: Bearer …` или `Authorization: Basic …`, либо `X-Timestamp` и `X-Signature` для HMAC (`hash_hmac('sha256', timestamp + body, secret)` по точному отправляемому body). Если auth method неактивен или истёк, доставка завершается ошибкой, а не отправляется без учётных данных. Чтобы убрать его, выберите `None` в **Authentication**.
+
 ### Auth Method
 
 Создаёт учётные данные, которыми endpoints проверяют входящие webhooks: API key, Basic Auth (имя пользователя и пароль), Bearer token или секрет HMAC. **Regenerate Credentials** заменяет сгенерированный token или секрет и возвращает новое значение.
@@ -161,6 +163,7 @@ Tokens, созданные до появления этих разрешений
 - **Get Many** фильтрует по endpoint, статусу (`success`, `error`, `pending`, `timeout`), HTTP-методу, коду ответа и диапазону дат. Сортировка: сначала новые или сначала старые.
 - **Get Deliveries** возвращает все попытки forwarding для request: код статуса, длительность, ошибку и тело ответа.
 - **Redeliver** повторно отправляет сохранённый request на все forwarding targets его endpoint, на один forwarding target или на указанный публичный URL.
+- Каждый request содержит `body` (разобранный) и `raw_body`: точные полученные байты для XML, простого текста или подписанных payload. `raw_body` равен `null`, если он совпадает с `body` в виде JSON.
 
 ### Использование как инструмента AI Agent
 
@@ -187,6 +190,8 @@ Node WebhookCatcher помечен как `usableAsTool`. Подключите �
 ```
 
 Отключите **Options → Include Headers**, чтобы получать только body и query.
+
+Включите **Options → Include Raw Body**, чтобы также выводить `rawBody` — body в точности как он был получен. WebhookCatcher пересылает исходные байты и `Content-Type`, поэтому XML, формы и webhooks с простым текстом приходят без изменений.
 
 > [!IMPORTANT]
 > WebhookCatcher должен иметь доступ к вашему экземпляру n8n. Задайте в n8n переменную `WEBHOOK_URL` с его публичным URL. Для n8n на `localhost` используйте Polling Trigger.

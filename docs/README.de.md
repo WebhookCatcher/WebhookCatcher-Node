@@ -152,6 +152,8 @@ Leitet jeden request, den ein endpoint akzeptiert, an eine andere URL weiter. Op
 
 Das Ziel muss eine öffentliche URL sein. Private, Loopback- und Link-Local-Adressen werden abgelehnt, um SSRF zu verhindern.
 
+Hat das Target eine auth method, authentifiziert WebhookCatcher jeden weitergeleiteten request damit: `X-API-KEY` für API keys, `Authorization: Bearer …` oder `Authorization: Basic …`, oder `X-Timestamp` und `X-Signature` für HMAC (`hash_hmac('sha256', timestamp + body, secret)` über den exakt gesendeten body). Ist die auth method inaktiv oder abgelaufen, schlägt die Zustellung fehl, statt ohne Zugangsdaten gesendet zu werden. Setze **Authentication** auf `None`, um sie zu entfernen.
+
 ### Auth Method
 
 Erstellt die Zugangsdaten, mit denen endpoints eingehende webhooks validieren: API key, Basic Auth (Benutzername und Passwort), Bearer token oder HMAC secret. **Regenerate Credentials** erneuert den generierten token oder das generierte secret und gibt den neuen Wert zurück.
@@ -161,6 +163,7 @@ Erstellt die Zugangsdaten, mit denen endpoints eingehende webhooks validieren: A
 - **Get Many** filtert nach endpoint, Status (`success`, `error`, `pending`, `timeout`), HTTP-Methode, Antwortcode und Zeitraum, sortiert mit den neuesten oder den ältesten zuerst.
 - **Get Deliveries** gibt jeden Weiterleitungsversuch eines requests zurück, mit Statuscode, Dauer, Fehler und Antwort-body.
 - **Redeliver** sendet einen gespeicherten request erneut an alle forwarding targets seines endpoints, an ein einzelnes forwarding target oder an eine eigene öffentliche URL.
+- Jeder request enthält `body` (geparst) und `raw_body`: die exakt empfangenen Bytes, für XML, Klartext oder signierte payloads. `raw_body` ist `null`, wenn er mit `body` als JSON identisch ist.
 
 ### Als AI Agent Tool verwenden
 
@@ -187,6 +190,8 @@ Ausgabe:
 ```
 
 Deaktiviere **Options → Include Headers**, um nur body und query auszugeben.
+
+Aktiviere **Options → Include Raw Body**, um zusätzlich `rawBody` auszugeben, den body genau so, wie er empfangen wurde. WebhookCatcher leitet die Originalbytes und den originalen `Content-Type` weiter, sodass XML-, Formular- und Klartext-webhooks unverändert ankommen.
 
 > [!IMPORTANT]
 > WebhookCatcher muss deine n8n-Instanz erreichen können. Setze `WEBHOOK_URL` in n8n auf die öffentliche URL. Für n8n auf `localhost` nutze den Polling Trigger.

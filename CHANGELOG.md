@@ -13,6 +13,8 @@
 - Return All and Limit on every Get Many operation.
 - The WebhookCatcher node can be used as an AI Agent tool.
 - Light and dark icons.
+- WebhookCatcher Trigger option **Include Raw Body** outputs the body exactly as received.
+- Requests include `raw_body` (exact bytes received) and forwarding targets include `auth_method_id`.
 
 ### Changed
 
@@ -26,3 +28,4 @@
 - Auth types now match the API values (`api_key`, `basic`, `bearer_token`, `hmac`, `none`).
 - HTTP methods are sent in the format the API expects.
 - Auth method credentials are sent inside `config`.
+- The auth method of a forwarding target is now saved and used to authenticate forwarded requests (requires WebhookCatcher with forwarding auth support).

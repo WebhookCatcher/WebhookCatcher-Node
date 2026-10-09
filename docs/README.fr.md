@@ -152,6 +152,8 @@ Transfère chaque request qu'un endpoint accepte vers une autre URL. Options : m
 
 La destination doit être une URL publique. Les adresses privées, de loopback et link-local sont rejetées pour empêcher le SSRF.
 
+Lorsque le target a une auth method, WebhookCatcher authentifie chaque request transféré avec elle : `X-API-KEY` pour les API keys, `Authorization: Bearer …` ou `Authorization: Basic …`, ou `X-Timestamp` et `X-Signature` pour HMAC (`hash_hmac('sha256', timestamp + body, secret)` sur le body exact envoyé). Si l'auth method est inactive ou expirée, la livraison échoue au lieu d'être envoyée sans identifiants. Choisissez `None` dans **Authentication** pour la retirer.
+
 ### Auth Method
 
 Crée les identifiants que les endpoints utilisent pour valider les webhooks entrants : API key, Basic Auth (nom d'utilisateur et mot de passe), Bearer token ou secret HMAC. **Regenerate Credentials** renouvelle le token ou le secret généré et renvoie la nouvelle valeur.
@@ -161,6 +163,7 @@ Crée les identifiants que les endpoints utilisent pour valider les webhooks ent
 - **Get Many** filtre par endpoint, statut (`success`, `error`, `pending`, `timeout`), méthode HTTP, code de réponse et plage de dates, trié du plus récent au plus ancien ou inversement.
 - **Get Deliveries** renvoie chaque tentative de forwarding d'une request avec son code de statut, sa durée, son erreur et le corps de la réponse.
 - **Redeliver** renvoie une request stockée à tous les forwarding targets de son endpoint, à un seul forwarding target, ou à une URL publique personnalisée.
+- Chaque request contient `body` (analysé) et `raw_body` : les octets exacts reçus, pour le XML, le texte brut ou les payloads signés. `raw_body` vaut `null` lorsqu'il est identique à `body` encodé en JSON.
 
 ### Utilisation comme outil d'AI Agent
 
@@ -187,6 +190,8 @@ Sortie :
 ```
 
 Désactivez **Options → Include Headers** pour ne sortir que le body et la query.
+
+Activez **Options → Include Raw Body** pour obtenir aussi `rawBody`, le body exactement tel qu'il a été reçu. WebhookCatcher transfère les octets et le `Content-Type` d'origine : les webhooks XML, de formulaire et en texte brut arrivent sans modification.
 
 > [!IMPORTANT]
 > WebhookCatcher doit pouvoir joindre votre instance n8n. Définissez `WEBHOOK_URL` dans n8n avec son URL publique. Pour n8n sur `localhost`, utilisez le Polling Trigger.

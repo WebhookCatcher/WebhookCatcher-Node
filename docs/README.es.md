@@ -152,6 +152,8 @@ Reenvía a otra URL cada request que acepta un endpoint. Opciones: método HTTP,
 
 El destino debe ser una URL pública. Las direcciones privadas, de loopback y link-local se rechazan para evitar SSRF.
 
+Cuando el target tiene un auth method, WebhookCatcher autentica cada request reenviado con él: `X-API-KEY` para API keys, `Authorization: Bearer …` o `Authorization: Basic …`, o `X-Timestamp` y `X-Signature` para HMAC (`hash_hmac('sha256', timestamp + body, secret)` sobre el body exacto que se envía). Si el auth method está inactivo o vencido, la entrega falla en lugar de enviarse sin credenciales. Elige `None` en **Authentication** para quitarlo.
+
 ### Auth Method
 
 Crea las credenciales que usan los endpoints para validar los webhooks entrantes: API key, Basic Auth (usuario y contraseña), token Bearer o secreto HMAC. **Regenerate Credentials** rota el token o secreto generado y devuelve el nuevo valor.
@@ -161,6 +163,7 @@ Crea las credenciales que usan los endpoints para validar los webhooks entrantes
 - **Get Many** filtra por endpoint, estado (`success`, `error`, `pending`, `timeout`), método HTTP, código de respuesta y rango de fechas, ordenados del más nuevo al más antiguo o al revés.
 - **Get Deliveries** devuelve cada intento de forwarding de un request con su código de estado, duración, error y cuerpo de la respuesta.
 - **Redeliver** vuelve a enviar un request almacenado a todos los forwarding targets de su endpoint, a un forwarding target o a una URL pública personalizada.
+- Cada request incluye `body` (parseado) y `raw_body`: los bytes exactos recibidos, para XML, texto plano o payloads firmados. `raw_body` es `null` cuando es idéntico a `body` codificado como JSON.
 
 ### Úsalo como herramienta de un AI Agent
 
@@ -187,6 +190,8 @@ Salida:
 ```
 
 Desactiva **Options → Include Headers** para obtener solo el body y el query.
+
+Activa **Options → Include Raw Body** para incluir también `rawBody`, el body exactamente como se recibió. WebhookCatcher reenvía los bytes y el `Content-Type` originales, así que los webhooks XML, de formulario y de texto plano llegan sin cambios.
 
 > [!IMPORTANT]
 > WebhookCatcher debe poder llegar a tu instancia de n8n. Configura `WEBHOOK_URL` en n8n con su URL pública. Si n8n corre en `localhost`, usa el Polling Trigger.

@@ -152,6 +152,8 @@ token 属于创建时处于活动状态的团队。所有使用该凭据的 node
 
 目标地址必须是公共 URL。私有、环回和链路本地地址会被拒绝，以防止 SSRF。
 
+当 target 配置了 auth method 时，WebhookCatcher 会用它为每个转发的 request 进行认证：API key 使用 `X-API-KEY`，`Authorization: Bearer …` 或 `Authorization: Basic …`，HMAC 使用 `X-Timestamp` 和 `X-Signature`（对实际发送的 body 计算 `hash_hmac('sha256', timestamp + body, secret)`）。如果 auth method 已停用或过期，投递会失败，而不会在没有凭据的情况下发送。将 **Authentication** 设为 `None` 即可移除。
+
 ### Auth Method
 
 创建 endpoints 用于验证传入 webhooks 的凭据：API key、Basic Auth（用户名和密码）、Bearer token 或 HMAC 密钥。**Regenerate Credentials** 会轮换生成的 token 或密钥，并返回新的值。
@@ -161,6 +163,7 @@ token 属于创建时处于活动状态的团队。所有使用该凭据的 node
 - **Get Many** 可按 endpoint、状态（`success`、`error`、`pending`、`timeout`）、HTTP 方法、响应码和日期范围筛选，并按从新到旧或从旧到新排序。
 - **Get Deliveries** 返回某个 request 的所有 forwarding 尝试，包括状态码、耗时、错误和响应正文。
 - **Redeliver** 将已存储的 request 重新发送到其 endpoint 的所有 forwarding targets、某一个 forwarding target，或自定义的公共 URL。
+- 每个 request 都包含 `body`（已解析）和 `raw_body`：收到的原始字节，适用于 XML、纯文本或带签名的 payload。当它与 `body` 编码为 JSON 后完全相同时，`raw_body` 为 `null`。
 
 ### 用作 AI Agent 工具
 
@@ -187,6 +190,8 @@ WebhookCatcher node 被标记为 `usableAsTool`。将它连接到 n8n **AI Agent
 ```
 
 关闭 **Options → Include Headers** 后，将只输出 body 和 query。
+
+开启 **Options → Include Raw Body** 后，还会输出 `rawBody`，即与接收时完全一致的 body。WebhookCatcher 会原样转发原始字节和 `Content-Type`，因此 XML、表单和纯文本 webhook 都能原样送达。
 
 > [!IMPORTANT]
 > WebhookCatcher 必须能够访问你的 n8n 实例。请在 n8n 中将 `WEBHOOK_URL` 设置为其公共 URL。如果 n8n 运行在 `localhost`，请使用 Polling Trigger。

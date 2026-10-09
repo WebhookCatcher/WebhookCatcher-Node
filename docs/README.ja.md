@@ -152,6 +152,8 @@ endpoint が受け付けたすべての request を、別の URL に転送しま
 
 転送先は公開 URL である必要があります。SSRF を防ぐため、プライベートアドレス、ループバックアドレス、リンクローカルアドレスは拒否されます。
 
+target に auth method が設定されている場合、WebhookCatcher は転送する各 request をそれで認証します。API key は `X-API-KEY`、`Authorization: Bearer …` または `Authorization: Basic …`、HMAC は `X-Timestamp` と `X-Signature`（送信する body そのものに対する `hash_hmac('sha256', timestamp + body, secret)`）です。auth method が無効または期限切れの場合、認証情報なしで送信するのではなく配信が失敗します。外すには **Authentication** を `None` にしてください。
+
 ### Auth Method
 
 endpoint が受信した webhook の検証に使う認証情報を作成します。API key、Basic Auth(ユーザー名とパスワード)、Bearer token、HMAC シークレットが使えます。**Regenerate Credentials** は、生成された token またはシークレットをローテーションし、新しい値を返します。
@@ -161,6 +163,7 @@ endpoint が受信した webhook の検証に使う認証情報を作成しま�
 - **Get Many** は、endpoint、ステータス(`success`、`error`、`pending`、`timeout`)、HTTP メソッド、レスポンスコード、日付範囲で絞り込み、新しい順または古い順に並べ替えます。
 - **Get Deliveries** は、request のすべての forwarding 試行を、ステータスコード、所要時間、エラー、レスポンス body とともに返します。
 - **Redeliver** は、保存済みの request を、その endpoint のすべての forwarding target、いずれか 1 つの forwarding target、またはカスタムの公開 URL に再送します。
+- 各 request には `body`（解析済み）と `raw_body`（受信した正確なバイト列。XML、プレーンテキスト、署名付き payload 用）が含まれます。`body` を JSON にしたものと同一の場合、`raw_body` は `null` です。
 
 ### AI Agent のツールとして使う
 
@@ -187,6 +190,8 @@ endpoint が webhook を受け付けると、すぐに workflow を開始しま�
 ```
 
 **Options → Include Headers** をオフにすると、body と query のみが出力されます。
+
+**Options → Include Raw Body** を有効にすると、受信したままの body である `rawBody` も出力します。WebhookCatcher は元のバイト列と `Content-Type` をそのまま転送するため、XML、フォーム、プレーンテキストの webhook も変更されずに届きます。
 
 > [!IMPORTANT]
 > WebhookCatcher から n8n インスタンスに到達できる必要があります。n8n の `WEBHOOK_URL` に公開 URL を設定してください。`localhost` 上の n8n では、Polling Trigger を使用してください。
