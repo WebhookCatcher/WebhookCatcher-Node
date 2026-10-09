@@ -1,6 +1,6 @@
 {
 	"name": "@webhookcatcher/n8n-nodes-webhookcatcher",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "n8n nodes for WebhookCatcher: manage endpoints, forwarding targets, auth methods and webhook requests, and trigger workflows from incoming webhooks.",
 	"license": "MIT",
 	"homepage": "https://github.com/WebhookCatcher/WebhookCatcher-Node#readme",
