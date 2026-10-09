@@ -1,4 +1,4 @@
-.PHONY: all help install build watch dev lint lint-fix format release publish publish-dry-run clean
+.PHONY: all help install build watch dev lint lint-fix format release clean
 
 all: build
 
@@ -13,8 +13,6 @@ help:
 	@echo "  make lint-fix  Fix the issues that can be fixed automatically"
 	@echo "  make format    Format the code with Prettier"
 	@echo "  make release   Bump the version, update the changelog, tag and push"
-	@echo "  make publish   Manually publish to npm (reads NPM_TOKEN from .env if set)"
-	@echo "  make publish-dry-run  Simulate the npm publish without uploading"
 	@echo "  make clean     Remove dist/"
 
 install:
@@ -40,19 +38,6 @@ format:
 
 release:
 	npm run release
-
-publish:
-	@set -a; [ -f .env ] && . ./.env; set +a; \
-	if [ -n "$$NPM_TOKEN" ]; then \
-		echo "Publishing using NPM_TOKEN from .env..."; \
-		npm publish --access public --//registry.npmjs.org/:_authToken=$$NPM_TOKEN; \
-	else \
-		echo "NPM_TOKEN not found in .env, using local npm credentials..."; \
-		npm publish --access public; \
-	fi
-
-publish-dry-run:
-	@npm publish --dry-run --access public
 
 clean:
 	rm -rf dist
