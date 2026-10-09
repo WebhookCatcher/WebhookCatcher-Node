@@ -47,7 +47,8 @@
 		"nodes": [
 			"dist/nodes/WebhookCatcher/WebhookCatcher.node.js",
 			"dist/nodes/WebhookCatcherTrigger/WebhookCatcherTrigger.node.js",
-			"dist/nodes/WebhookCatcherPollingTrigger/WebhookCatcherPollingTrigger.node.js"
+			"dist/nodes/WebhookCatcherPollingTrigger/WebhookCatcherPollingTrigger.node.js",
+			"dist/nodes/WebhookCatcherEventTrigger/WebhookCatcherEventTrigger.node.js"
 		]
 	},
 	"devDependencies": {

@@ -15,6 +15,9 @@
 - Light and dark icons.
 - WebhookCatcher Trigger option **Include Raw Body** outputs the body exactly as received.
 - Requests include `raw_body` (exact bytes received) and forwarding targets include `auth_method_id`.
+- **WebhookCatcher Event Trigger**: starts workflows on WebhookCatcher alerts (failed delivery, rate limited request, security event, monthly usage warning, test alert), with signed events.
+- **Request** operations: Delete, Delete Many and Redeliver Many, with filters or a list of request IDs.
+- **Endpoint** fields: Response Status Code, Response Body (with `{{body.*}}`, `{{query.*}}` and `{{header.*}}` placeholders) and Response Headers.
 
 ### Changed
 

@@ -40,6 +40,34 @@ function endpointBody(fields: IDataObject): IDataObject {
 		rate_limit: fields.rateLimit,
 		rate_limit_period: fields.rateLimitPeriod,
 		description: fields.description,
+		response_status: fields.responseStatus,
+		response_body: fields.responseBody,
+		response_headers: headersFromCollection(fields.responseHeaders as IDataObject | undefined),
+	});
+}
+
+/**
+ * Safety cap for the delete/redeliver many loops: 100 calls are 1,000,000 deleted or 10,000
+ * redelivered requests.
+ */
+const MAX_BULK_BATCHES = 100;
+
+function requestFilters(filters: IDataObject): IDataObject {
+	const ids = typeof filters.ids === 'string' ? filters.ids : '';
+
+	return compactObject({
+		ids: ids
+			? ids
+					.split(',')
+					.map((id) => id.trim())
+					.filter((id) => id !== '')
+			: undefined,
+		endpoint_id: filters.endpointId,
+		status: filters.status,
+		method: filters.method,
+		response_code: filters.responseCode,
+		from: filters.from,
+		to: filters.to,
 	});
 }
 
@@ -338,7 +366,71 @@ async function runOperation(
 			});
 		}
 
+		if (operation === 'deleteMany' || operation === 'redeliverMany') {
+			const filters = requestFilters(this.getNodeParameter('filters', i) as IDataObject);
+
+			if (Object.keys(filters).length === 0) {
+				throw new NodeOperationError(this.getNode(), 'Add at least one filter or request ID', {
+					itemIndex: i,
+				});
+			}
+
+			if (operation === 'deleteMany') {
+				let deleted = 0;
+
+				// Each call deletes up to 10,000 requests; matching requests left over are deleted next.
+				for (let batch = 0; batch < MAX_BULK_BATCHES; batch++) {
+					const response = await webhookCatcherApiRequest.call(
+						this,
+						'POST',
+						'requests/bulk-delete',
+						filters,
+					);
+					deleted += (response.deleted as number) ?? 0;
+
+					if (response.has_more !== true || response.deleted === 0) {
+						break;
+					}
+				}
+
+				return { deleted };
+			}
+
+			const body: IDataObject = { ...filters };
+
+			if (this.getNodeParameter('destination', i) === 'target') {
+				body.forwarding_target_id = this.getNodeParameter('forwardingTargetId', i);
+			}
+
+			const requestIds: string[] = [];
+			let deliveries = 0;
+
+			// Each call redelivers up to 100 requests; next_after continues where it stopped.
+			for (let batch = 0; batch < MAX_BULK_BATCHES; batch++) {
+				const response = await webhookCatcherApiRequest.call(
+					this,
+					'POST',
+					'requests/bulk-redeliver',
+					body,
+				);
+				requestIds.push(...((response.request_ids as string[]) ?? []));
+				deliveries += (response.deliveries as number) ?? 0;
+
+				if (response.has_more !== true || !response.next_after) {
+					break;
+				}
+
+				body.after = response.next_after;
+			}
+
+			return { redelivered: requestIds.length, deliveries, request_ids: requestIds };
+		}
+
 		const requestId = this.getNodeParameter('requestId', i) as string;
+
+		if (operation === 'delete') {
+			return await webhookCatcherApiRequest.call(this, 'DELETE', `requests/${requestId}`);
+		}
 
 		if (operation === 'get') {
 			return unwrap(await webhookCatcherApiRequest.call(this, 'GET', `requests/${requestId}`));

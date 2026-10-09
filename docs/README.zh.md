@@ -29,13 +29,14 @@
 
 ---
 
-此软件包为 n8n 添加了三个 nodes：
+此软件包为 n8n 添加了四个 nodes：
 
 | Node | 功能 |
 | :--- | :--- |
 | **WebhookCatcher** | 管理 endpoints、forwarding targets、auth methods 和 webhook requests，查看账户用量和分析数据，并重新投递 requests。n8n AI Agents 也可以将其用作工具。 |
 | **WebhookCatcher Trigger** | 每当 endpoint 收到 webhook 时，实时启动 workflow。需要一个可从互联网访问的 n8n 实例。 |
 | **WebhookCatcher Polling Trigger** | 在存储了新的 requests 时启动 workflow。适用于运行在 localhost 或防火墙之后的 n8n。 |
+| **WebhookCatcher Event Trigger** | 当 WebhookCatcher 发出告警时启动 workflow：投递失败、因 rate limit 被拒绝的 request、安全事件或用量警告。 |
 
 ## 目录
 
@@ -45,6 +46,7 @@
 - [WebhookCatcher node](#webhookcatcher-node)
 - [WebhookCatcher Trigger](#webhookcatcher-trigger)
 - [WebhookCatcher Polling Trigger](#webhookcatcher-polling-trigger)
+- [WebhookCatcher Event Trigger](#webhookcatcher-event-trigger)
 - [我该使用哪个 trigger？](#我该使用哪个-trigger)
 - [示例 workflows](#示例-workflows)
 - [故障排查](#故障排查)
@@ -107,7 +109,10 @@ token 属于创建时处于活动状态的团队。所有使用该凭据的 node
 | `auth-methods:read` | 列出和读取 auth methods。 |
 | `auth-methods:write` | 创建、更新、删除和重新生成 auth methods。 |
 | `requests:read` | 列出和读取 webhook requests 及其 forwarding 投递记录。 |
-| `requests:redeliver` | 重新投递（重放）webhook requests。 |
+| `requests:redeliver` | 重新投递（重放）webhook requests，可逐个或批量进行。 |
+| `requests:delete` | 删除 webhook requests，可逐个或批量进行。 |
+| `events:read` | 读取告警事件订阅。 |
+| `events:write` | 创建、更新和删除告警事件订阅。 |
 | `cli:tunnel` | 供 WebhookCatcher CLI 使用。在 n8n 中不需要。 |
 
 各 node 使用的权限：
@@ -122,9 +127,11 @@ token 属于创建时处于活动状态的团队。所有使用该凭据的 node
 | Auth Method → Get, Get Many | `auth-methods:read` |
 | Auth Method → Create, Update, Delete, Regenerate Credentials | `auth-methods:write` |
 | Request → Get, Get Many, Get Deliveries | `requests:read` |
-| Request → Redeliver | `requests:redeliver` |
+| Request → Redeliver, Redeliver Many | `requests:redeliver` |
+| Request → Delete, Delete Many | `requests:delete` |
 | WebhookCatcher Trigger | `endpoints:read`, `forwarding-targets:read`, `forwarding-targets:write` |
 | WebhookCatcher Polling Trigger | `endpoints:read`, `requests:read` |
+| WebhookCatcher Event Trigger | `events:read`, `events:write` |
 
 在这些权限出现之前创建的 token 仍然有效：`read` 包含所有 `:read` 权限，`write` 包含创建、更新和删除，`*` 包含所有权限。
 
@@ -138,13 +145,14 @@ token 属于创建时处于活动状态的团队。所有使用该凭据的 node
 | **Endpoint** | Create · Get · Get Many · Update · Delete |
 | **Forwarding Target** | Create · Get · Get Many · Update · Delete |
 | **Auth Method** | Create · Get · Get Many · Update · Delete · Regenerate Credentials |
-| **Request** | Get · Get Many · Get Deliveries · Redeliver |
+| **Request** | Get · Get Many · Get Deliveries · Redeliver · Redeliver Many · Delete · Delete Many |
 
 ### Endpoint
 
 - **Create** 需要填写名称、路径、接受的 HTTP 方法，以及身份验证方式（`None`、`API Key`、`Basic Auth`、`Bearer Token` 或 `HMAC`）和用于验证的 auth method。附加字段：描述、启用状态和速率限制。
 - **Update** 只会发送你设置的字段，endpoint 的其余部分保持不变。
 - **Get Many** 支持 **Return All** 或 **Limit**，并可按启用状态筛选。
+- **Response Status Code**、**Response Body** 和 **Response Headers** 设置 webhook 被接受时返回给发送方的内容（默认为 `200` 和 JSON body）。body 可以通过 `{{body.*}}`、`{{query.*}}` 和 `{{header.*}}` placeholders 回显 request 中的值，例如用于 Slack URL 验证的 `{{body.challenge}}`。如果没有 `Content-Type` header，JSON body 以 `application/json` 发送，其他内容以 `text/plain` 发送。
 
 ### Forwarding Target
 
@@ -163,6 +171,8 @@ token 属于创建时处于活动状态的团队。所有使用该凭据的 node
 - **Get Many** 可按 endpoint、状态（`success`、`error`、`pending`、`timeout`）、HTTP 方法、响应码和日期范围筛选，并按从新到旧或从旧到新排序。
 - **Get Deliveries** 返回某个 request 的所有 forwarding 尝试，包括状态码、耗时、错误和响应正文。
 - **Redeliver** 将已存储的 request 重新发送到其 endpoint 的所有 forwarding targets、某一个 forwarding target，或自定义的公共 URL。
+- **Redeliver Many** 将符合筛选条件（或 request ID 列表）的所有 requests 按从旧到新的顺序，重新发送到其 endpoint 的 forwarding targets 或某一个 forwarding target。node 会逐批处理（每次调用 100 个 requests），直到全部加入队列，并返回已重新投递的 request ID。
+- **Delete** 删除一个 request 及其转发尝试。**Delete Many** 删除符合筛选条件或 request ID 列表的所有 requests。至少需要一个筛选条件，因此 workflow 不会误删整个日志。
 - 每个 request 都包含 `body`（已解析）和 `raw_body`：收到的原始字节，适用于 XML、纯文本或带签名的 payload。当它与 `body` 编码为 JSON 后完全相同时，`raw_body` 为 `null`。
 
 ### 用作 AI Agent 工具
@@ -196,6 +206,52 @@ WebhookCatcher node 被标记为 `usableAsTool`。将它连接到 n8n **AI Agent
 > [!IMPORTANT]
 > WebhookCatcher 必须能够访问你的 n8n 实例。请在 n8n 中将 `WEBHOOK_URL` 设置为其公共 URL。如果 n8n 运行在 `localhost`，请使用 Polling Trigger。
 
+## WebhookCatcher Event Trigger
+
+当 WebhookCatcher 发出告警时启动 workflow。在 **Events** 中选择事件：
+
+| 事件 | 发送时机 |
+| :--- | :--- |
+| **Delivery Failed** (`webhook_failed`) | webhook 在所有尝试后仍无法投递到 forwarding target。 |
+| **Rate Limited** (`rate_limited`) | endpoint 拒绝了超出其 rate limit 的 requests。 |
+| **Security Event** (`security_events`) | request 因缺少凭据或凭据无效被拒绝，auth method 被创建、更新、重新生成或删除，或 endpoint 被删除。 |
+| **Monthly Usage Warning** (`monthly_usage_warning`) | 团队已使用每月 webhook 配额的 80%，达到 100% 时会再次发送。 |
+| **Test Alert** (`test`) | 你在 WebhookCatcher 的 **Alerts** 页面点击 **Send Test Alert**。 |
+
+rate limit 和凭据被拒绝事件每个 endpoint 每 5 分钟最多发送一次，因此一波被拒绝的 requests 只会触发一次执行。
+
+激活时，node 会创建一个指向 n8n webhook URL 的事件订阅。WebhookCatcher 使用 `X-WebhookCatcher-Signature`（`HMAC-SHA256(secret, X-WebhookCatcher-Timestamp + body)`）为每个事件签名。签名无效或超过 5 分钟的事件会被 n8n 以 `401` 拒绝。停用 workflow 时会删除该订阅。
+
+输出：
+
+```json
+{
+  "id": "0199c2a4-5f1e-7c3a-9d1b-2f4e6a8b0c1d",
+  "event": "webhook_failed",
+  "title": "Webhook Delivery Failed",
+  "message": "Delivery to Billing failed: Server Error",
+  "team": { "id": 1, "slug": "acme", "name": "Acme" },
+  "data": {
+    "webhook_request_id": "0199c2a4-...",
+    "endpoint_id": "0199c2a0-...",
+    "forwarding_target_id": "0199c2a1-...",
+    "forwarding_target_name": "Billing",
+    "url": "https://billing.example.com/hooks",
+    "attempts": 4,
+    "response_status": 500,
+    "error": "Server Error"
+  },
+  "occurred_at": "2026-10-09T15:04:05+00:00"
+}
+```
+
+其他事件的 `data`：因 rate limit 或未授权被拒绝的 requests 包含 `endpoint_id`、`endpoint_name`、`endpoint_path`、`status_code`、`error`、`method` 和 `ip`；auth method 和 endpoint 的变更包含 `action`、`auth_method_id`、`auth_type`、`endpoint_id` 和 `user`；用量警告包含 `used`、`limit`、`percentage`、`threshold` 和 `month`。
+
+这些事件与你可以通过邮件、Slack 或 Discord 接收的事件相同。event trigger 不依赖这些告警设置。
+
+> [!IMPORTANT]
+> WebhookCatcher 必须能够访问你的 n8n 实例。请在 n8n 中将 `WEBHOOK_URL` 设置为其公共 URL。
+
 ## WebhookCatcher Polling Trigger
 
 按你选择的 polling 间隔（每分钟、每小时等）检查 WebhookCatcher 中是否有新的 requests。
@@ -223,6 +279,10 @@ WebhookCatcher node 被标记为 `usableAsTool`。将它连接到 n8n **AI Agent
 - **被拒绝 webhooks 的告警**：**Status = Error** 的 Polling Trigger → 发送包含 endpoint、响应码和错误信息的邮件或 Slack 消息。
 - **重试失败的转发**：Schedule Trigger → Request: Get Many（状态为 `error`，最近一小时） → Request: Get Deliveries → Request: Redeliver。
 - **每日用量报告**：Schedule Trigger → Account: Get 和 Get Analytics → Google Sheets。
+- **投递失败事件处理**：Event Trigger (Delivery Failed) → PagerDuty 或 Slack → 目标恢复后执行 Request: Redeliver。
+- **用量告警**：Event Trigger (Monthly Usage Warning) → 给账户所有者发送邮件。
+- **数据保留**：Schedule Trigger（每天） → Request: Delete Many（Received Before：30 天前）。
+- **Slack 应用验证**：Endpoint: Create，并将 **Response Body** 设为 `{{body.challenge}}`。
 - **客户入驻**：Form Trigger → Auth Method: Create → Endpoint: Create → Forwarding Target: Create → 将 URL 和凭据发送给客户。
 
 ## 故障排查
@@ -234,6 +294,7 @@ WebhookCatcher node 被标记为 `usableAsTool`。将它连接到 n8n **AI Agent
 | `403 This API token does not have the "…" permission` | 在 WebhookCatcher → API Tokens 中编辑 token 的权限。 |
 | 带有字段错误的 `422` | node 会显示每个字段的验证消息。请检查你发送的值。 |
 | Trigger 一直不触发 | n8n 不是公开可访问的、未设置 `WEBHOOK_URL`，或者 endpoint 在转发之前就拒绝了该 webhook（请检查其身份验证）。请尝试 Polling Trigger。 |
+| Event Trigger 从未触发 | n8n 不是公开的，或未设置 `WEBHOOK_URL`。在 WebhookCatcher 的 Alerts 页面点击 **Send Test Alert** 进行检查。 |
 | `URLs pointing to private or internal networks are not allowed.` | Forwarding targets 和重新投递不能使用私有或本地地址。 |
 | 下拉列表为空 | token 需要相应的 `:read` 权限。 |
 
@@ -275,6 +336,7 @@ nodes/
   WebhookCatcher/                       Action node, shared API helpers and descriptions
   WebhookCatcherTrigger/                Real-time trigger (forwarding target + secret header)
   WebhookCatcherPollingTrigger/         Polling trigger (cursor on request ids)
+  WebhookCatcherEventTrigger/           Alert events trigger (signed event subscription)
 docs/                                   Translated READMEs and images
 ```
 

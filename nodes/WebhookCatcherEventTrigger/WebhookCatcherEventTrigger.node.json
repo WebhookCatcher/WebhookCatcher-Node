@@ -1,0 +1,17 @@
+{
+	"node": "@webhookcatcher/n8n-nodes-webhookcatcher.webhookCatcherEventTrigger",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Development", "Utility"],
+	"alias": ["webhook", "alert", "monitoring", "incident", "rate limit", "usage"],
+	"resources": {
+		"credentialDocumentation": [
+			{ "url": "https://github.com/WebhookCatcher/WebhookCatcher-Node#credentials" }
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/WebhookCatcher/WebhookCatcher-Node#webhookcatcher-event-trigger"
+			}
+		]
+	}
+}

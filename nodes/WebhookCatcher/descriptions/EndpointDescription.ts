@@ -31,6 +31,43 @@ const commonFields: INodeProperties[] = [
 		typeOptions: { minValue: 1, maxValue: 86400 },
 		default: 60,
 	},
+	{
+		displayName: 'Response Body',
+		name: 'responseBody',
+		type: 'string',
+		typeOptions: { rows: 4 },
+		default: '',
+		placeholder: '{"challenge":"{{body.challenge}}"}',
+		description:
+			'Body sent back to the sender when a webhook is accepted. {{body.*}}, {{query.*}} and {{header.*}} placeholders echo values of the request, e.g. for Slack URL verification.',
+	},
+	{
+		displayName: 'Response Headers',
+		name: 'responseHeaders',
+		type: 'fixedCollection',
+		typeOptions: { multipleValues: true },
+		placeholder: 'Add Header',
+		default: {},
+		description: 'Headers sent back to the sender when a webhook is accepted',
+		options: [
+			{
+				displayName: 'Header',
+				name: 'header',
+				values: [
+					{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+					{ displayName: 'Value', name: 'value', type: 'string', default: '' },
+				],
+			},
+		],
+	},
+	{
+		displayName: 'Response Status Code',
+		name: 'responseStatus',
+		type: 'number',
+		typeOptions: { minValue: 200, maxValue: 599 },
+		default: 200,
+		description: 'HTTP status sent back to the sender when a webhook is accepted',
+	},
 ];
 
 export const endpointOperations: INodeProperties[] = [

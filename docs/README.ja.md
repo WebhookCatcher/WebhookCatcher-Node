@@ -29,13 +29,14 @@
 
 ---
 
-このパッケージは n8n に 3 つの node を追加します。
+このパッケージは n8n に 4 つの node を追加します。
 
 | Node | 機能 |
 | :--- | :--- |
 | **WebhookCatcher** | endpoint、forwarding target、auth method、webhook request の管理、アカウントの使用状況と analytics の確認、request の再配信ができます。n8n の AI Agent からツールとして使うこともできます。 |
 | **WebhookCatcher Trigger** | endpoint が webhook を受信するたびに、リアルタイムで workflow を開始します。インターネットから到達可能な n8n インスタンスが必要です。 |
 | **WebhookCatcher Polling Trigger** | 新しい request が保存されたときに workflow を開始します。localhost やファイアウォールの内側にある n8n でも動作します。 |
+| **WebhookCatcher Event Trigger** | WebhookCatcher がアラートを発生させたときに workflow を開始します。対象は配信の失敗、rate limit 超過の request、セキュリティイベント、使用量の警告です。 |
 
 ## 目次
 
@@ -45,6 +46,7 @@
 - [WebhookCatcher node](#webhookcatcher-node)
 - [WebhookCatcher Trigger](#webhookcatcher-trigger)
 - [WebhookCatcher Polling Trigger](#webhookcatcher-polling-trigger)
+- [WebhookCatcher Event Trigger](#webhookcatcher-event-trigger)
 - [どちらの trigger を使うべきですか？](#どちらの-trigger-を使うべきですか)
 - [workflow の例](#workflow-の例)
 - [トラブルシューティング](#トラブルシューティング)
@@ -107,7 +109,10 @@ token は、作成時にアクティブだったチームに属します。こ�
 | `auth-methods:read` | auth method の一覧表示と取得。 |
 | `auth-methods:write` | auth method の作成、更新、削除、再生成。 |
 | `requests:read` | webhook request とその forwarding の配信結果の一覧表示と取得。 |
-| `requests:redeliver` | webhook request の再配信(リプレイ)。 |
+| `requests:redeliver` | webhook request の再配信(リプレイ)。個別または一括で行えます。 |
+| `requests:delete` | webhook request の削除。個別または一括で行えます。 |
+| `events:read` | アラートイベントのサブスクリプションの読み取り。 |
+| `events:write` | アラートイベントのサブスクリプションの作成、更新、削除。 |
 | `cli:tunnel` | WebhookCatcher CLI で使用されます。n8n では不要です。 |
 
 各 node が使用する権限:
@@ -122,9 +127,11 @@ token は、作成時にアクティブだったチームに属します。こ�
 | Auth Method → Get, Get Many | `auth-methods:read` |
 | Auth Method → Create, Update, Delete, Regenerate Credentials | `auth-methods:write` |
 | Request → Get, Get Many, Get Deliveries | `requests:read` |
-| Request → Redeliver | `requests:redeliver` |
+| Request → Redeliver, Redeliver Many | `requests:redeliver` |
+| Request → Delete, Delete Many | `requests:delete` |
 | WebhookCatcher Trigger | `endpoints:read`, `forwarding-targets:read`, `forwarding-targets:write` |
 | WebhookCatcher Polling Trigger | `endpoints:read`, `requests:read` |
+| WebhookCatcher Event Trigger | `events:read`, `events:write` |
 
 これらの権限が導入される前に作成された token も引き続き使えます。`read` はすべての `:read` 権限を、`write` は作成、更新、削除を、`*` はすべてを許可します。
 
@@ -138,13 +145,14 @@ token に権限が不足している場合、API は `This API token does not ha
 | **Endpoint** | Create · Get · Get Many · Update · Delete |
 | **Forwarding Target** | Create · Get · Get Many · Update · Delete |
 | **Auth Method** | Create · Get · Get Many · Update · Delete · Regenerate Credentials |
-| **Request** | Get · Get Many · Get Deliveries · Redeliver |
+| **Request** | Get · Get Many · Get Deliveries · Redeliver · Redeliver Many · Delete · Delete Many |
 
 ### Endpoint
 
 - **Create** では、名前、パス、受け付ける HTTP メソッド、認証(`None`、`API Key`、`Basic Auth`、`Bearer Token`、`HMAC`)と、それを検証する auth method を指定します。追加フィールドとして、説明、有効状態、レート制限があります。
 - **Update** は、設定したフィールドだけを送信します。endpoint のそれ以外の部分は変更されません。
 - **Get Many** は **Return All** または **Limit** に対応し、有効状態で絞り込めます。
+- **Response Status Code**、**Response Body**、**Response Headers** で、webhook が受け付けられたときに送信元へ返す内容を設定します(デフォルトは `200` と JSON の body)。body では `{{body.*}}`、`{{query.*}}`、`{{header.*}}` の placeholder で request の値を返せます。たとえば Slack の URL 検証には `{{body.challenge}}` を使います。`Content-Type` header がない場合、JSON の body は `application/json`、それ以外は `text/plain` として送信されます。
 
 ### Forwarding Target
 
@@ -163,6 +171,8 @@ endpoint が受信した webhook の検証に使う認証情報を作成しま�
 - **Get Many** は、endpoint、ステータス(`success`、`error`、`pending`、`timeout`)、HTTP メソッド、レスポンスコード、日付範囲で絞り込み、新しい順または古い順に並べ替えます。
 - **Get Deliveries** は、request のすべての forwarding 試行を、ステータスコード、所要時間、エラー、レスポンス body とともに返します。
 - **Redeliver** は、保存済みの request を、その endpoint のすべての forwarding target、いずれか 1 つの forwarding target、またはカスタムの公開 URL に再送します。
+- **Redeliver Many** は、フィルター(または request ID のリスト)に一致するすべての request を、古い順に、その endpoint の forwarding target またはいずれか 1 つの forwarding target に再送します。node はバッチごと(1 回の呼び出しで 100 件)に処理を続けてすべてをキューに入れ、再配信した request の ID を返します。
+- **Delete** は request とその転送試行を削除します。**Delete Many** はフィルターまたは request ID のリストに一致するすべての request を削除します。workflow が誤ってログ全体を空にしないよう、少なくとも 1 つのフィルターが必要です。
 - 各 request には `body`（解析済み）と `raw_body`（受信した正確なバイト列。XML、プレーンテキスト、署名付き payload 用）が含まれます。`body` を JSON にしたものと同一の場合、`raw_body` は `null` です。
 
 ### AI Agent のツールとして使う
@@ -196,6 +206,52 @@ endpoint が webhook を受け付けると、すぐに workflow を開始しま�
 > [!IMPORTANT]
 > WebhookCatcher から n8n インスタンスに到達できる必要があります。n8n の `WEBHOOK_URL` に公開 URL を設定してください。`localhost` 上の n8n では、Polling Trigger を使用してください。
 
+## WebhookCatcher Event Trigger
+
+WebhookCatcher がアラートを発生させたときに workflow を開始します。**Events** でイベントを選択してください。
+
+| イベント | 送信されるタイミング |
+| :--- | :--- |
+| **Delivery Failed** (`webhook_failed`) | webhook がすべての試行を終えても forwarding target に配信できなかったとき。 |
+| **Rate Limited** (`rate_limited`) | endpoint が rate limit を超えた request を拒否したとき。 |
+| **Security Event** (`security_events`) | 認証情報がない、または無効なために request が拒否されたとき、auth method が作成・更新・再生成・削除されたとき、または endpoint が削除されたとき。 |
+| **Monthly Usage Warning** (`monthly_usage_warning`) | チームが月間 webhook 枠の 80% を使用したとき。100% に達したときにも再度送信されます。 |
+| **Test Alert** (`test`) | WebhookCatcher の **Alerts** ページで **Send Test Alert** をクリックしたとき。 |
+
+rate limit と認証情報の拒否によるイベントは endpoint ごとに 5 分に最大 1 回だけ送信されるため、拒否された request が集中しても実行は 1 回だけです。
+
+有効化すると、node は n8n の webhook URL を指すイベントサブスクリプションを作成します。WebhookCatcher はすべてのイベントに `X-WebhookCatcher-Signature`(`HMAC-SHA256(secret, X-WebhookCatcher-Timestamp + body)`)で署名します。署名が無効なイベントや 5 分より古いイベントは、n8n が `401` で拒否します。workflow を無効化するとサブスクリプションは削除されます。
+
+出力:
+
+```json
+{
+  "id": "0199c2a4-5f1e-7c3a-9d1b-2f4e6a8b0c1d",
+  "event": "webhook_failed",
+  "title": "Webhook Delivery Failed",
+  "message": "Delivery to Billing failed: Server Error",
+  "team": { "id": 1, "slug": "acme", "name": "Acme" },
+  "data": {
+    "webhook_request_id": "0199c2a4-...",
+    "endpoint_id": "0199c2a0-...",
+    "forwarding_target_id": "0199c2a1-...",
+    "forwarding_target_name": "Billing",
+    "url": "https://billing.example.com/hooks",
+    "attempts": 4,
+    "response_status": 500,
+    "error": "Server Error"
+  },
+  "occurred_at": "2026-10-09T15:04:05+00:00"
+}
+```
+
+その他のイベントの `data`: rate limit 超過と未認証の request では `endpoint_id`、`endpoint_name`、`endpoint_path`、`status_code`、`error`、`method`、`ip`、auth method と endpoint の変更では `action`、`auth_method_id`、`auth_type`、`endpoint_id`、`user`、使用量の警告では `used`、`limit`、`percentage`、`threshold`、`month` です。
+
+これらはメール、Slack、Discord で受け取れるイベントと同じものです。event trigger はそれらのアラート設定には依存しません。
+
+> [!IMPORTANT]
+> WebhookCatcher から n8n インスタンスに到達できる必要があります。n8n の `WEBHOOK_URL` に公開 URL を設定してください。
+
 ## WebhookCatcher Polling Trigger
 
 選択した polling 間隔(毎分、毎時など)で、WebhookCatcher に新しい request がないか確認します。
@@ -223,6 +279,10 @@ endpoint が webhook を受け付けると、すぐに workflow を開始しま�
 - **拒否された webhook のアラート**: **Status = Error** の Polling Trigger → endpoint、レスポンスコード、エラーを含むメールまたは Slack メッセージ。
 - **失敗した転送の再試行**: Schedule Trigger → Request: Get Many (ステータス `error`、直近 1 時間) → Request: Get Deliveries → Request: Redeliver。
 - **日次の使用状況レポート**: Schedule Trigger → Account: Get と Get Analytics → Google Sheets。
+- **配信失敗のインシデント**: Event Trigger (Delivery Failed) → PagerDuty または Slack → 宛先が復旧したら Request: Redeliver。
+- **使用量アラート**: Event Trigger (Monthly Usage Warning) → アカウントオーナーにメール。
+- **データ保持**: Schedule Trigger (毎日) → Request: Delete Many (Received Before: 30 日前)。
+- **Slack アプリの検証**: **Response Body** を `{{body.challenge}}` にして Endpoint: Create。
 - **顧客のオンボーディング**: Form Trigger → Auth Method: Create → Endpoint: Create → Forwarding Target: Create → URL と認証情報を顧客に送信。
 
 ## トラブルシューティング
@@ -234,6 +294,7 @@ endpoint が webhook を受け付けると、すぐに workflow を開始しま�
 | `403 This API token does not have the "…" permission` | WebhookCatcher → API Tokens で token の権限を編集してください。 |
 | フィールドエラーを伴う `422` | node が各フィールドの検証メッセージを表示します。送信している値を確認してください。 |
 | Trigger が発火しない | n8n が公開されていない、`WEBHOOK_URL` が未設定、または endpoint が転送前に webhook を拒否しています(その認証を確認してください)。Polling Trigger を試してください。 |
+| Event Trigger が起動しない | n8n が公開されていないか、`WEBHOOK_URL` が設定されていません。WebhookCatcher の Alerts ページで **Send Test Alert** をクリックして確認してください。 |
 | `URLs pointing to private or internal networks are not allowed.` | forwarding target と再配信では、プライベートアドレスやローカルアドレスは使用できません。 |
 | ドロップダウンが空 | token に対応する `:read` 権限が必要です。 |
 
@@ -275,6 +336,7 @@ nodes/
   WebhookCatcher/                       Action node, shared API helpers and descriptions
   WebhookCatcherTrigger/                Real-time trigger (forwarding target + secret header)
   WebhookCatcherPollingTrigger/         Polling trigger (cursor on request ids)
+  WebhookCatcherEventTrigger/           Alert events trigger (signed event subscription)
 docs/                                   Translated READMEs and images
 ```
 

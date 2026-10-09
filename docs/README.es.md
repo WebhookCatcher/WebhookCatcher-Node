@@ -29,13 +29,14 @@
 
 ---
 
-Este paquete agrega tres nodes a n8n:
+Este paquete agrega cuatro nodes a n8n:
 
 | Node | Qué hace |
 | :--- | :--- |
 | **WebhookCatcher** | Administra endpoints, forwarding targets, auth methods y requests de webhooks, consulta el uso y las analíticas de tu cuenta, y reentrega requests. Los AI Agents de n8n también pueden usarlo como herramienta. |
 | **WebhookCatcher Trigger** | Inicia un workflow en tiempo real cada vez que un endpoint recibe un webhook. Necesita una instancia de n8n accesible desde internet. |
 | **WebhookCatcher Polling Trigger** | Inicia un workflow cuando se almacenan nuevos requests. Funciona con n8n en localhost o detrás de un firewall. |
+| **WebhookCatcher Event Trigger** | Inicia un workflow cuando WebhookCatcher genera una alerta: una entrega fallida, un request con rate limit, un evento de seguridad o un aviso de uso. |
 
 ## Contenido
 
@@ -45,6 +46,7 @@ Este paquete agrega tres nodes a n8n:
 - [Node WebhookCatcher](#node-webhookcatcher)
 - [WebhookCatcher Trigger](#webhookcatcher-trigger)
 - [WebhookCatcher Polling Trigger](#webhookcatcher-polling-trigger)
+- [WebhookCatcher Event Trigger](#webhookcatcher-event-trigger)
 - [¿Qué trigger debo usar?](#qué-trigger-debo-usar)
 - [Workflows de ejemplo](#workflows-de-ejemplo)
 - [Solución de problemas](#solución-de-problemas)
@@ -107,7 +109,10 @@ Dale a cada token solo los permisos que necesitan sus workflows.
 | `auth-methods:read` | Listar y leer auth methods. |
 | `auth-methods:write` | Crear, actualizar, eliminar y regenerar auth methods. |
 | `requests:read` | Listar y leer requests de webhooks y sus entregas de forwarding. |
-| `requests:redeliver` | Reentregar (reproducir) requests de webhooks. |
+| `requests:redeliver` | Reentregar (reproducir) requests de webhooks, uno por uno o en lote. |
+| `requests:delete` | Eliminar requests de webhooks, uno por uno o en lote. |
+| `events:read` | Leer las suscripciones a eventos de alertas. |
+| `events:write` | Crear, actualizar y eliminar suscripciones a eventos de alertas. |
 | `cli:tunnel` | Lo usa el CLI de WebhookCatcher. No se necesita en n8n. |
 
 Permisos que usa cada node:
@@ -122,9 +127,11 @@ Permisos que usa cada node:
 | Auth Method → Get, Get Many | `auth-methods:read` |
 | Auth Method → Create, Update, Delete, Regenerate Credentials | `auth-methods:write` |
 | Request → Get, Get Many, Get Deliveries | `requests:read` |
-| Request → Redeliver | `requests:redeliver` |
+| Request → Redeliver, Redeliver Many | `requests:redeliver` |
+| Request → Delete, Delete Many | `requests:delete` |
 | WebhookCatcher Trigger | `endpoints:read`, `forwarding-targets:read`, `forwarding-targets:write` |
 | WebhookCatcher Polling Trigger | `endpoints:read`, `requests:read` |
+| WebhookCatcher Event Trigger | `events:read`, `events:write` |
 
 Los tokens creados antes de que existieran estos permisos siguen funcionando: `read` permite todos los permisos `:read`, `write` permite crear, actualizar y eliminar, y `*` permite todo.
 
@@ -138,13 +145,14 @@ Cuando a un token le falta un permiso, la API responde `403` con `This API token
 | **Endpoint** | Create · Get · Get Many · Update · Delete |
 | **Forwarding Target** | Create · Get · Get Many · Update · Delete |
 | **Auth Method** | Create · Get · Get Many · Update · Delete · Regenerate Credentials |
-| **Request** | Get · Get Many · Get Deliveries · Redeliver |
+| **Request** | Get · Get Many · Get Deliveries · Redeliver · Redeliver Many · Delete · Delete Many |
 
 ### Endpoint
 
 - **Create** recibe un nombre, una ruta, el método HTTP aceptado y la autenticación (`None`, `API Key`, `Basic Auth`, `Bearer Token` o `HMAC`) con el auth method que la valida. Campos adicionales: descripción, estado activo y límite de frecuencia.
 - **Update** envía solo los campos que configuras. El resto del endpoint se queda como está.
 - **Get Many** admite **Return All** o un **Limit**, y filtra por estado activo.
+- **Response Status Code**, **Response Body** y **Response Headers** definen lo que recibe el remitente cuando se acepta un webhook (por defecto `200` con un body JSON). El body puede devolver valores del request con los placeholders `{{body.*}}`, `{{query.*}}` y `{{header.*}}`, por ejemplo `{{body.challenge}}` para la verificación de URL de Slack. Sin un header `Content-Type`, los bodies JSON se envían como `application/json` y todo lo demás como `text/plain`.
 
 ### Forwarding Target
 
@@ -163,6 +171,8 @@ Crea las credenciales que usan los endpoints para validar los webhooks entrantes
 - **Get Many** filtra por endpoint, estado (`success`, `error`, `pending`, `timeout`), método HTTP, código de respuesta y rango de fechas, ordenados del más nuevo al más antiguo o al revés.
 - **Get Deliveries** devuelve cada intento de forwarding de un request con su código de estado, duración, error y cuerpo de la respuesta.
 - **Redeliver** vuelve a enviar un request almacenado a todos los forwarding targets de su endpoint, a un forwarding target o a una URL pública personalizada.
+- **Redeliver Many** vuelve a enviar todos los requests que coinciden con los filtros (o una lista de IDs de requests), del más antiguo al más nuevo, a los forwarding targets de su endpoint o a un forwarding target. El node avanza lote por lote (100 requests por llamada) hasta encolarlos todos y devuelve los IDs de los requests reentregados.
+- **Delete** elimina un request con sus intentos de forwarding. **Delete Many** elimina todos los requests que coinciden con los filtros o una lista de IDs de requests. Se requiere al menos un filtro, así que un workflow nunca puede vaciar todo el log por error.
 - Cada request incluye `body` (parseado) y `raw_body`: los bytes exactos recibidos, para XML, texto plano o payloads firmados. `raw_body` es `null` cuando es idéntico a `body` codificado como JSON.
 
 ### Úsalo como herramienta de un AI Agent
@@ -196,6 +206,52 @@ Activa **Options → Include Raw Body** para incluir también `rawBody`, el body
 > [!IMPORTANT]
 > WebhookCatcher debe poder llegar a tu instancia de n8n. Configura `WEBHOOK_URL` en n8n con su URL pública. Si n8n corre en `localhost`, usa el Polling Trigger.
 
+## WebhookCatcher Event Trigger
+
+Inicia el workflow cuando WebhookCatcher genera una alerta. Selecciona los eventos en **Events**:
+
+| Evento | Se envía cuando |
+| :--- | :--- |
+| **Delivery Failed** (`webhook_failed`) | Un webhook no se pudo entregar a un forwarding target después de todos sus intentos. |
+| **Rate Limited** (`rate_limited`) | Un endpoint rechazó requests que superaron su rate limit. |
+| **Security Event** (`security_events`) | Se rechazó un request por credenciales faltantes o no válidas, se creó, actualizó, regeneró o eliminó un auth method, o se eliminó un endpoint. |
+| **Monthly Usage Warning** (`monthly_usage_warning`) | El equipo usó el 80% de su cuota mensual de webhooks, y otra vez al llegar al 100%. |
+| **Test Alert** (`test`) | Haces clic en **Send Test Alert** en la página **Alerts** de WebhookCatcher. |
+
+Los eventos de rate limit y de credenciales rechazadas se envían como máximo una vez cada 5 minutos por endpoint, así que una ráfaga de requests rechazados inicia una sola ejecución.
+
+Al activarse, el node crea una suscripción a eventos que apunta a la URL del webhook de n8n. WebhookCatcher firma cada evento con `X-WebhookCatcher-Signature` (`HMAC-SHA256(secret, X-WebhookCatcher-Timestamp + body)`). n8n rechaza con `401` los eventos con una firma no válida o con más de 5 minutos de antigüedad. La suscripción se elimina cuando se desactiva el workflow.
+
+Salida:
+
+```json
+{
+  "id": "0199c2a4-5f1e-7c3a-9d1b-2f4e6a8b0c1d",
+  "event": "webhook_failed",
+  "title": "Webhook Delivery Failed",
+  "message": "Delivery to Billing failed: Server Error",
+  "team": { "id": 1, "slug": "acme", "name": "Acme" },
+  "data": {
+    "webhook_request_id": "0199c2a4-...",
+    "endpoint_id": "0199c2a0-...",
+    "forwarding_target_id": "0199c2a1-...",
+    "forwarding_target_name": "Billing",
+    "url": "https://billing.example.com/hooks",
+    "attempts": 4,
+    "response_status": 500,
+    "error": "Server Error"
+  },
+  "occurred_at": "2026-10-09T15:04:05+00:00"
+}
+```
+
+`data` para los demás eventos: `endpoint_id`, `endpoint_name`, `endpoint_path`, `status_code`, `error`, `method` e `ip` para requests con rate limit o no autorizados, `action`, `auth_method_id`, `auth_type`, `endpoint_id` y `user` para cambios en auth methods y endpoints, y `used`, `limit`, `percentage`, `threshold` y `month` para los avisos de uso.
+
+Son los mismos eventos que puedes recibir por correo, Slack o Discord. El event trigger no depende de esa configuración de alertas.
+
+> [!IMPORTANT]
+> WebhookCatcher debe poder llegar a tu instancia de n8n. Configura `WEBHOOK_URL` en n8n con su URL pública.
+
 ## WebhookCatcher Polling Trigger
 
 Consulta WebhookCatcher en busca de nuevos requests con el intervalo de polling que elijas (cada minuto, cada hora, …).
@@ -223,6 +279,10 @@ Una ejecución de prueba manual devuelve el último request para que puedas mape
 - **Alerta de webhooks rechazados**: Polling Trigger con **Status = Error** → correo o mensaje de Slack con el endpoint, el código de respuesta y el error.
 - **Reintentar forwards fallidos**: Schedule Trigger → Request: Get Many (estado `error`, última hora) → Request: Get Deliveries → Request: Redeliver.
 - **Reporte diario de uso**: Schedule Trigger → Account: Get y Get Analytics → Google Sheets.
+- **Incidente por entregas fallidas**: Event Trigger (Delivery Failed) → PagerDuty o Slack → Request: Redeliver cuando el destino vuelva a estar disponible.
+- **Alerta de uso**: Event Trigger (Monthly Usage Warning) → correo al dueño de la cuenta.
+- **Retención de datos**: Schedule Trigger (diario) → Request: Delete Many (Received Before: hace 30 días).
+- **Verificación de una app de Slack**: Endpoint: Create con **Response Body** `{{body.challenge}}`.
 - **Onboarding de clientes**: Form Trigger → Auth Method: Create → Endpoint: Create → Forwarding Target: Create → enviar la URL y las credenciales al cliente.
 
 ## Solución de problemas
@@ -234,6 +294,7 @@ Una ejecución de prueba manual devuelve el último request para que puedas mape
 | `403 This API token does not have the "…" permission` | Edita los permisos del token en WebhookCatcher → API Tokens. |
 | `422` con errores de campos | El node muestra el mensaje de validación de cada campo. Revisa los valores que envías. |
 | El Trigger nunca se dispara | n8n no es público, `WEBHOOK_URL` no está configurada, o el endpoint rechaza el webhook antes de reenviarlo (revisa su autenticación). Prueba el Polling Trigger. |
+| El Event Trigger nunca se dispara | n8n no es público o `WEBHOOK_URL` no está configurado. Haz clic en **Send Test Alert** en la página Alerts de WebhookCatcher para comprobarlo. |
 | `URLs pointing to private or internal networks are not allowed.` | Los forwarding targets y las reentregas no pueden usar direcciones privadas ni locales. |
 | Los menús desplegables están vacíos | El token necesita el permiso `:read` correspondiente. |
 
@@ -275,6 +336,7 @@ nodes/
   WebhookCatcher/                       Action node, shared API helpers and descriptions
   WebhookCatcherTrigger/                Real-time trigger (forwarding target + secret header)
   WebhookCatcherPollingTrigger/         Polling trigger (cursor on request ids)
+  WebhookCatcherEventTrigger/           Alert events trigger (signed event subscription)
 docs/                                   Translated READMEs and images
 ```
 
